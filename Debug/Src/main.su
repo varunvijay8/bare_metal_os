@@ -12,8 +12,11 @@ main.c:212:10:get_psp_value	4	static
 main.c:220:6:save_psp_value	16	static
 main.c:228:30:switch_sp_to_psp	0	static,ignoring_inline_asm
 main.c:247:5:main	8	static
-main.c:269:6:task_delay	16	static
-main.c:280:30:SysTick_Handler	0	static,ignoring_inline_asm
-main.c:323:6:HardFault_Handler	8	static
-main.c:330:6:MemManage_Handler	8	static
-main.c:337:6:BusFault_Handler	8	static
+main.c:269:6:schedule	4	static
+main.c:281:6:task_delay	16	static,ignoring_inline_asm
+main.c:308:30:PendSV_Handler	0	static,ignoring_inline_asm
+main.c:349:6:unblock_tasks	16	static
+main.c:370:6:SysTick_Handler	8	static,ignoring_inline_asm
+main.c:391:6:HardFault_Handler	8	static
+main.c:398:6:MemManage_Handler	8	static
+main.c:405:6:BusFault_Handler	8	static

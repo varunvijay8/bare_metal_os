@@ -13,7 +13,13 @@
 #define LED_RED    14
 #define LED_BLUE   15
 
+#define HW_DELAY	1
+
+#if HW_DELAY
+#define DELAY_COUNT_1MS 		 1
+#else // SW Delay
 #define DELAY_COUNT_1MS 		 1250U
+#endif // HW_DELAY
 #define DELAY_COUNT_1S  		(1000U * DELAY_COUNT_1MS)
 #define DELAY_COUNT_500MS  		(500U  * DELAY_COUNT_1MS)
 #define DELAY_COUNT_250MS 		(250U  * DELAY_COUNT_1MS)

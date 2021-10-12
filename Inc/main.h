@@ -9,6 +9,17 @@
 #define MAIN_H_
 
 /**
+ * Core registers
+ */
+#define INTERRUPT_DISABLE()		do {__asm volatile ("MOV R0, 0x1"); __asm volatile ("MSR PRIMASK, R0");}while(0)
+#define INTERRUPT_ENABLE()		do {__asm volatile ("MOV R0, 0x0"); __asm volatile ("MSR PRIMASK, R0");}while(0)
+/**
+ * System Control block registers
+ */
+#define ICSR					*((uint32_t*) 0xE000ED04)
+#define ICSR_PENDSVSET_MASK		(1 << 28)
+
+/**
  * Fault configuration registers
  */
 #define SHCRS	*((uint32_t*) 0xE000ED24)
@@ -71,7 +82,7 @@
  * Task definitions
  */
 #define NUMBER_OF_TASKS		(4+1)		// extra 1 for idle task
-#define TASK_RUNNING_STATE  0
+#define TASK_READY_STATE  0
 #define TASK_BLOCKED_STATE  1
 //efine TASK_READY_STATE    2
 

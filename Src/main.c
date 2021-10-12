@@ -28,11 +28,11 @@
 #endif
 
 
-TCB_t taskTCBs[] = { 	{(uint32_t*) IDLE_STACK_START, 0, TASK_RUNNING_STATE, idle_task},
-						{(uint32_t*) T1_STACK_START, 0, TASK_RUNNING_STATE, task1_handler},
-						{(uint32_t*) T2_STACK_START, 0, TASK_RUNNING_STATE, task2_handler},
-						{(uint32_t*) T3_STACK_START, 0, TASK_RUNNING_STATE, task3_handler},
-						{(uint32_t*) T4_STACK_START, 0, TASK_RUNNING_STATE, task4_handler}};
+TCB_t taskTCBs[] = { 	{(uint32_t*) IDLE_STACK_START, 0, TASK_READY_STATE, idle_task},
+						{(uint32_t*) T1_STACK_START, 0, TASK_READY_STATE, task1_handler},
+						{(uint32_t*) T2_STACK_START, 0, TASK_READY_STATE, task2_handler},
+						{(uint32_t*) T3_STACK_START, 0, TASK_READY_STATE, task3_handler},
+						{(uint32_t*) T4_STACK_START, 0, TASK_READY_STATE, task4_handler}};
 //// PSP of tasks
 //uint32_t* taskStackPointer[] = { 	(uint32_t*) T1_STACK_START,
 //									(uint32_t*) T2_STACK_START,
@@ -101,9 +101,9 @@ void task1_handler(void) {
 
 	while(1) {
 		led_on(LED_GREEN);
-		delay(DELAY_COUNT_1S);
+		task_delay(DELAY_COUNT_1S);
 		led_off(LED_GREEN);
-		delay(DELAY_COUNT_1S);
+		task_delay(DELAY_COUNT_1S);
 	}
 }
 
@@ -111,9 +111,9 @@ void task2_handler(void) {
 
 	while(1) {
 		led_on(LED_ORANGE);
-		delay(DELAY_COUNT_500MS);
+		task_delay(DELAY_COUNT_500MS);
 		led_off(LED_ORANGE);
-		delay(DELAY_COUNT_500MS);
+		task_delay(DELAY_COUNT_500MS);
 	}
 }
 
@@ -121,9 +121,9 @@ void task3_handler(void) {
 
 	while(1) {
 		led_on(LED_RED);
-		delay(DELAY_COUNT_250MS);
+		task_delay(DELAY_COUNT_250MS);
 		led_off(LED_RED);
-		delay(DELAY_COUNT_250MS);
+		task_delay(DELAY_COUNT_250MS);
 	}
 }
 
@@ -131,9 +131,9 @@ void task4_handler(void) {
 
 	while(1) {
 		led_on(LED_BLUE);
-		delay(DELAY_COUNT_125MS);
+		task_delay(DELAY_COUNT_125MS);
 		led_off(LED_BLUE);
-		delay(DELAY_COUNT_125MS);
+		task_delay(DELAY_COUNT_125MS);
 	}
 }
 
@@ -264,26 +264,48 @@ int main(void)
 }
 
 /**
- * Block current task tick_count(ms)
+ * Schedule next ready task to run
  */
-void task_delay(uint32_t tick_count) {
-
-	taskTCBs[current_task].block_count = g_tick_count + tick_count;
-	taskTCBs[current_task].run_state = TASK_BLOCKED_STATE;
+void schedule(void) {
+	/**
+	 * Set PendSV
+	 */
+	ICSR |= ICSR_PENDSVSET_MASK;
 }
 
 /**
- * SysTick handler
+ * Block current task for tick_count(ms) and yield
  *
- * note: implemented as naked
+ * note: function is atomic since we are accessing global data
  */
-__attribute__ ((naked)) void SysTick_Handler(void) {
+void task_delay(uint32_t tick_count) {
+
+	// disable interrupt
+	INTERRUPT_DISABLE();
 
 	/**
-	 * Increment global tick count every ms
+	 * Delay not applicable for idle task
 	 */
-	__asm volatile("ADD R0, %0, #1"::"r"(g_tick_count):);
-	__asm volatile("MOV %0, R0":"=r"(g_tick_count)::);
+	if (current_task) {
+		taskTCBs[current_task].block_count = g_tick_count + tick_count;
+		taskTCBs[current_task].run_state = TASK_BLOCKED_STATE;
+
+		/**
+		 * Schedule next ready task to run
+		 *
+		 */
+		schedule();
+	}
+
+	// enable interrupt
+	INTERRUPT_ENABLE();
+}
+
+/**
+ * PendSV handler - perform context switch to next running task
+ *
+ */
+__attribute__ ((naked)) void PendSV_Handler(void) {
 
 	/**
 	 * Save the context of current task
@@ -318,6 +340,52 @@ __attribute__ ((naked)) void SysTick_Handler(void) {
 	// exit will automatically restore SF1
 	__asm volatile("POP {LR}");
 	__asm volatile("BX LR");
+
+}
+
+/**
+ * Unblock tasks whose delay has expired
+ */
+void unblock_tasks(void) {
+
+	for(uint32_t task = 1; task < NUMBER_OF_TASKS; task++) {
+
+		if( (taskTCBs[task].run_state == TASK_BLOCKED_STATE) &&
+				(taskTCBs[task].block_count <= g_tick_count)) {
+
+			taskTCBs[task].run_state = TASK_READY_STATE;
+		}
+	}
+}
+
+/**
+ * SysTick handler
+ *
+ * - Increment global tick counter
+ * - Decide which task to run next
+ * - Set PendSV to handle context switch
+ *
+ * note: implemented as naked
+ */
+void SysTick_Handler(void) {
+
+	/**
+	 * Increment global tick count every ms
+	 */
+	__asm volatile("ADD R0, %0, #1"::"r"(g_tick_count):);
+	__asm volatile("MOV %0, R0":"=r"(g_tick_count)::);
+
+	/**
+	 * Unblock tasks whose delay has expired
+	 */
+	unblock_tasks();
+
+	/**
+	 * Schedule next ready task to run
+	 *
+	 */
+	schedule();
+
 }
 
 void HardFault_Handler(void) {
